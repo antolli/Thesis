@@ -17,15 +17,16 @@ ppro = PreProcessing()
 np.random.seed(7)
 
 MODEL_PATH = 'trained_model.h5'
-DATASET = 'Krapivin2009'  # Hulth2003, SemEval2010, Krapivin2009
-EMBEDDING = 'glove.6B.50d.txt'
-EMBEDDING_LENGTH = 50
+DATASET = 'Hulth2003'  # Hulth2003, SemEval2010, Krapivin2009, SemEval2017
+EMBEDDING = 'glove.6B.200d.txt'
+EMBEDDING_LENGTH = 200
 MAX_REVIEW_LENGTH = 516
 
 BATCH_SIZE = 32
-EPOCHS = 10
+EPOCHS = 14
 
 x_loaded, y_loaded, files = ppro.load_data(DATASET) # load dataset
+print files.train[0], x_loaded.train[0], y_loaded.train[0]
 
 word_index = ppro.build_indices(x_loaded) # word_index: dictionary of the words in the docs
 
@@ -48,13 +49,13 @@ if not os.path.isfile(MODEL_PATH) :
                                                 weights=[embeddings_matrix],
                                                 input_length=MAX_REVIEW_LENGTH,
                                                 trainable=False, name='embedding'))
-        model.add(Bidirectional(LSTM(516, activation='tanh', recurrent_activation='hard_sigmoid', return_sequences=True), name='bi')) 
-        model.add(Dropout(0.5))
-        model.add(TimeDistributed(Dense(200, activation='relu',kernel_regularizer=regularizers.l2(0.01)), name='dense_relu'))
-        model.add(Dropout(0.5))
+        model.add(Bidirectional(LSTM(150, activation='tanh', recurrent_activation='hard_sigmoid', return_sequences=True), name='bi')) 
+        model.add(Dropout(0.25))
+        model.add(TimeDistributed(Dense(150, activation='relu',kernel_regularizer=regularizers.l2(0.01)), name='dense_relu'))
+        model.add(Dropout(0.25))
         model.add(TimeDistributed(Dense(3, activation='softmax'), name='out'))
         #model.load_weights('model_weights_kr.h5') fineTuning
-        optimizer = optimizers.Adam(lr=0.006)
+        optimizer = optimizers.RMSprop(lr=0.001, rho=0.9, epsilon=1e-08, decay=0.0) # check it better latter
         model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'], sample_weight_mode="temporal")
         print(model.summary())
         validation_data=(x.validation, y.validation, sample_weights_val) # will override validation_split.

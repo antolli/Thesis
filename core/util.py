@@ -28,7 +28,7 @@ class Reader():
                     x.append(text) 
                     files_list.append(f)
                     y.append(self.calc_expected_values(text_vec, list_keyphr))
-                "------------------ SEMEVAL DATASET--------------------------------------------------------"
+                "------------------ SEMEVAL 2010 DATASET----------------------------------------------------"
                 if dataset == "SemEval2010":
                     if not list_keyphr:
                        dict_ann = {}
@@ -68,10 +68,37 @@ class Reader():
 			       text_vec = kerasPreProc.text_to_word_sequence(text.encode("utf-8"))
 			       x.append(text.encode("utf-8"))
 			       files_list.append(count_doc) 
-			       list_keyphr = [kerasPreProc.text_to_word_sequence(kp.encode("utf-8")) for kp in d["keyword"].split(";")] 
+                               kp_list = d["keyword"].split(";")
+			       list_keyphr = [kerasPreProc.text_to_word_sequence(kp.encode("utf-8")) for kp in kp_list] 
                                y.append(self.calc_expected_values(text_vec, list_keyphr))
                                count_doc = count_doc + 1
-                "--------------------------------------------------------------------------------------------"             
+                "------------------ SEMEVAL 2017 DATASET------------------------------------------------------" 
+                if dataset == "SemEval2017":
+                    if not f.endswith(".ann"):
+		       continue
+		    f_anno = open(os.path.join(path, f), "rU")
+		    f_text = open(os.path.join(path, f.replace(".ann", ".txt")), "rU")
+                    text = "".join(map(str, f_text))
+                    # code based on utility script (util.py) available on: https://scienceie.github.io/resources.html
+                    kp_list = []
+		    for l in f_anno:
+		        anno_inst = l.strip("\n").split("\t")
+		        if len(anno_inst) == 3:
+		           anno_inst1 = anno_inst[1].split(" ")
+		           if len(anno_inst1) == 3:
+		              keytype, start, end = anno_inst1
+		           else:
+		              keytype, start, _, end = anno_inst1
+		           if not keytype.endswith("-of"): # e.g.:Synonym-of
+			      keyphr_ann = anno_inst[2] 
+			      kp_list.append(keyphr_ann)
+                    list_keyphr = [kerasPreProc.text_to_word_sequence(kp) for kp in kp_list]
+
+                    text_vec = kerasPreProc.text_to_word_sequence(text)
+                    x.append(text) 
+                    files_list.append(f)
+                    y.append(self.calc_expected_values(text_vec, list_keyphr))
+                "---------------------------------------------------------------------------------------------"           
 
             return  x, y, files_list
 
