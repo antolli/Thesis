@@ -15,19 +15,17 @@ class PreProcessing():
         
         def load_data(self, dataset):
             util = Reader()
-            x, y, files = [], [], [] 
+            x, y, f = {}, {}, {} 
             for i in range(len(PreProcessing.types)):
-                x_, y_, f_ = util.read_terms(dataset, PreProcessing.types[i])
-                x.append(x_)
-                y.append(y_)
-                files.append(f_)
+                typ = PreProcessing.types[i]
+                x[typ], y[typ], f[typ] = util.read_terms(dataset, typ)
 
-            x = Data().make(x[0],x[1],x[2]); # the indices 0, 1 and 2 are the data of each type in "types", 
-            y = Data().make(y[0],y[1],y[2]); # that is, Training, Validation and Test for "x", "y" and "files"
-            files = Data().make(files[0],files[1],files[2]);
+            x_obj = Data().make(x['Training'],x['Validation'],x['Test']);
+            y_obj = Data().make(y['Training'],y['Validation'],y['Test']);
+            files = Data().make(f['Training'],f['Validation'],f['Test']);
 
             print('completed: load_data')
-            return x, y, files
+            return x_obj, y_obj, files
 
         def build_indices(self, x_):
             texts = x_.train + x_.validation + x_.test
@@ -56,18 +54,21 @@ class PreProcessing():
 
         def build_dataset(self, x, word_index):
 
-            x_train = [kerasPreProc.text_to_word_sequence(text) for text in x.train ]
-            x_valid = [kerasPreProc.text_to_word_sequence(text) for text in x.validation ]
-            x_test  = [kerasPreProc.text_to_word_sequence(text) for text in x.test ]
-
             f = lambda word: word_index.get(word.lower()) if word_index.has_key(word.lower()) else -1
-
-            x.train = np.array([[f(word) for word in x_train[s]] for s in range(len(x_train))])
-            x.test = np.array([[f(word) for word in x_test[s]] for s in range(len(x_test))])
-            x.validation = np.array([[f(word) for word in x_valid[s]] for s in range(len(x_valid))])
+            data = Data()
+            d = x.__dir__()
+            for key, value in d.items():
+                word_seq = [kerasPreProc.text_to_word_sequence(text) for text in value ]
+                numb_seq = [[f(word) for word in word_seq[s]] for s in range(len(word_seq))]
+		if key == "train": 
+		   data.train = np.array(numb_seq)
+		elif key == "test":
+                   data.test = np.array(numb_seq)
+                else: 
+                   data.validation = np.array(numb_seq)
 
             print('completed: build_dataset')  
-            return x
+            return data
 
         def truncate_pad(self, data, max_len):
             data.train = sequence.pad_sequences(data.train, maxlen=max_len, padding='post',truncating='post')

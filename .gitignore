@@ -39,3 +39,6 @@ Thumbs.db
 # Embeddings #
 ######################
 core/embeddings/*.txt
+
+# Datasets #
+core/datasets/Krapivin2009/Training/ke20k_training.json

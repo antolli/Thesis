@@ -17,24 +17,23 @@ ppro = PreProcessing()
 np.random.seed(7)
 
 MODEL_PATH = 'trained_model.h5'
-DATASET = 'Hulth2003'
+DATASET = 'Krapivin2009'  # Hulth2003, SemEval2010, Krapivin2009
 EMBEDDING = 'glove.6B.50d.txt'
 EMBEDDING_LENGTH = 50
 MAX_REVIEW_LENGTH = 516
 
 BATCH_SIZE = 32
-EPOCHS = 18
+EPOCHS = 10
 
-x, y, files = ppro.load_data(DATASET) # load dataset
+x_loaded, y_loaded, files = ppro.load_data(DATASET) # load dataset
 
-word_index = ppro.build_indices(x) # word_index: dictionary of the words in the docs
-x_test_loaded = x.test # saves x.test before building dataset
+word_index = ppro.build_indices(x_loaded) # word_index: dictionary of the words in the docs
 
 embeddings_matrix = ppro.build_dict_embeddings(word_index, EMBEDDING_LENGTH, EMBEDDING) # maps embedd. -> word_index
-x = ppro.build_dataset(x, word_index) # replaces each word for its index in word_index
+x = ppro.build_dataset(x_loaded, word_index) # replaces each word for its index in word_index
 
 x = ppro.truncate_pad(x, MAX_REVIEW_LENGTH) # truncate and pad input sequences (to x)
-y = ppro.truncate_pad(y, MAX_REVIEW_LENGTH) # idem (to y)
+y = ppro.truncate_pad(y_loaded, MAX_REVIEW_LENGTH) # idem (to y)
 y = ppro.convert_onehot(y, MAX_REVIEW_LENGTH) # one-hot encoding 
 
 # assigns different weights for each training example (Marco code)
@@ -97,5 +96,5 @@ model_predict = model.predict(x=x.test, batch_size=32, verbose=0)
 print("Saving to file...")
 #instantiate output
 output = Output()
-output.generate_obtained_file(model_predict=model_predict, x=x_test_loaded, files=files.test)
+output.generate_obtained_file(model_predict=model_predict, x=x_loaded.test, files=files.test)
 print("Done.")

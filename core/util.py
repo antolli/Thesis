@@ -1,4 +1,5 @@
 import os
+import json
 import collections
 import numpy as np
 from nltk import PorterStemmer
@@ -7,24 +8,10 @@ import keras.preprocessing.text as kerasPreProc
 class Reader():
                      
         def read_terms(self, dataset, typ):            
-            x = []
-            y = []
-            files_list = []
+            x, y, files_list = [], [], []
+            f_text, list_keyphr = [], []
             path = "datasets/%s/%s" % (dataset, typ) 
 
-            "------------------ SEMEVAL DATASET----------------------------------------------------------"               
-            if dataset == "SemEval2010":
-               dict_ann = dict()
-               name_file_ann = 'train' if typ == 'Training' else 'test' if typ == 'Test' else 'trial'
-               name_file_ann = ''.join([name_file_ann, '.combined.final'])
-               with open(os.path.join(path, name_file_ann)) as f_ann:
-                    # these splits are not used for the text processing.
-                    linespl = [line.split(':') for line in f_ann]
-                    for l in linespl: # It won't be used to feed the network.
-                        name_doc = l[0].strip() # split each row by "name_doc" and "kp_found"
-                        kp_found = l[1].split(',') 
-                        dict_ann[name_doc] = [ kerasPreProc.text_to_word_sequence(kp) for kp in kp_found]
-            "---------------------------------------------------------------------------------------------"
             for f in os.listdir(path):
                 "------------------ HULTH DATASET----------------------------------------------------------"
                 if dataset == "Hulth2003":
@@ -35,27 +22,58 @@ class Reader():
                     text = "".join(map(str, f_text))
 
                     kp_uncontr = "".join(map(str, f_uncontr))
-                    list_keyphr = [ kerasPreProc.text_to_word_sequence(kp) for kp in kp_uncontr.split(";")] 
-       
+                    list_keyphr = [ kerasPreProc.text_to_word_sequence(kp) for kp in kp_uncontr.split(";")]
+
+                    text_vec = kerasPreProc.text_to_word_sequence(text)
+                    x.append(text) 
+                    files_list.append(f)
+                    y.append(self.calc_expected_values(text_vec, list_keyphr))
                 "------------------ SEMEVAL DATASET--------------------------------------------------------"
                 if dataset == "SemEval2010":
+                    if not list_keyphr:
+                       dict_ann = {}
+                       name_file_ann = 'train' if typ == 'Training' else 'test' if typ == 'Test' else 'trial'
+                       name_file_ann = ''.join([name_file_ann, '.combined.final'])
+                       with open(os.path.join(path, name_file_ann)) as f_ann:
+                            # these splits are not used for the text processing.
+                            linespl = [line.split(':') for line in f_ann]
+                            for l in linespl: # It won't be used to feed the network.
+                                name_doc = l[0].strip() # split each row by "name_doc" and "kp_found"
+                                kp_found = l[1].split(',') 
+                                dict_ann[name_doc] = [ kerasPreProc.text_to_word_sequence(kp) for kp in kp_found]
                     if not f.endswith(".txt.final"):
                         continue
                     f_text = open(os.path.join(path, f), "rU")
                     list_keyphr = dict_ann[f.split('.')[0]]
+                    content = "".join(map(str, f_text))
+                    if typ != 'Test':
+                       text = content 
+                    else: 
+                       stm = lambda string: PorterStemmer().stem(string)
+                       text = ''.join(map(stm, content))
 
-                    stm = lambda string: PorterStemmer().stem(string)
-                    content = "".join(map(str, f_text)) 
-                    text = content if typ != 'Test' else  ''.join(map(stm, content))                
-                                
-                "------------------------------------------------------------------------------------------"                
-                text_vec = kerasPreProc.text_to_word_sequence(text)
-                x.append(text) 
-                files_list.append(f)
+                    text_vec = kerasPreProc.text_to_word_sequence(text)
+                    x.append(text) 
+                    files_list.append(f)
+                    y.append(self.calc_expected_values(text_vec, list_keyphr))
+                "------------------ KRAPIVIN DATASET----------------------------------------------------------"
+                if dataset == "Krapivin2009":
+                    file_name = ''.join(['ke20k_', typ.lower(), '.json'])
+                    with open(os.path.join(path, file_name)) as f:
+		         count_doc = 1
+    		         for line in f:
+		            if count_doc <= 2000: # needed because 20k is too large
+	    		       d = json.loads(line)
+			       text = ''.join([d["title"], d["abstract"]])
+			       text_vec = kerasPreProc.text_to_word_sequence(text.encode("utf-8"))
+			       x.append(text.encode("utf-8"))
+			       files_list.append(count_doc) 
+			       list_keyphr = [kerasPreProc.text_to_word_sequence(kp.encode("utf-8")) for kp in d["keyword"].split(";")] 
+                               y.append(self.calc_expected_values(text_vec, list_keyphr))
+                               count_doc = count_doc + 1
+                "--------------------------------------------------------------------------------------------"             
 
-                y.append(self.calc_expected_values(text_vec, list_keyphr))   
             return  x, y, files_list
-
 
         def calc_expected_values(self, text_vec, list_keyphr):
             y_inner = np.zeros(np.shape(text_vec))
