@@ -23,19 +23,16 @@ EMBEDDING_LENGTH = 200
 MAX_REVIEW_LENGTH = 516
 
 BATCH_SIZE = 32
-EPOCHS = 14
+EPOCHS = 8
 
 x_loaded, y_loaded, files = ppro.load_data(DATASET) # load dataset
-print files.train[0], x_loaded.train[0], y_loaded.train[0]
-
 word_index = ppro.build_indices(x_loaded) # word_index: dictionary of the words in the docs
-
 embeddings_matrix = ppro.build_dict_embeddings(word_index, EMBEDDING_LENGTH, EMBEDDING) # maps embedd. -> word_index
-x = ppro.build_dataset(x_loaded, word_index) # replaces each word for its index in word_index
+x = ppro.build_dataset(x_loaded) # replaces each word for its index in word_index
 
 x = ppro.truncate_pad(x, MAX_REVIEW_LENGTH) # truncate and pad input sequences (to x)
 y = ppro.truncate_pad(y_loaded, MAX_REVIEW_LENGTH) # idem (to y)
-y = ppro.convert_onehot(y, MAX_REVIEW_LENGTH) # one-hot encoding 
+y = ppro.convert_onehot(y) # one-hot encoding 
 
 # assigns different weights for each training example (Marco code)
 sample_weights = ppro.diff_weights(x.train, y.train)
@@ -51,7 +48,7 @@ if not os.path.isfile(MODEL_PATH) :
                                                 trainable=False, name='embedding'))
         model.add(Bidirectional(LSTM(150, activation='tanh', recurrent_activation='hard_sigmoid', return_sequences=True), name='bi')) 
         model.add(Dropout(0.25))
-        model.add(TimeDistributed(Dense(150, activation='relu',kernel_regularizer=regularizers.l2(0.01)), name='dense_relu'))
+        model.add(TimeDistributed(Dense(150, activation='relu', kernel_regularizer=regularizers.l2(0.01)), name='dense_relu'))
         model.add(Dropout(0.25))
         model.add(TimeDistributed(Dense(3, activation='softmax'), name='out'))
         #model.load_weights('model_weights_kr.h5') fineTuning

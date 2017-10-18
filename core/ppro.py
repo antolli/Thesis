@@ -7,6 +7,7 @@ from keras.preprocessing import sequence
 import keras.preprocessing.text as kerasPreProc
 from keras.preprocessing.sequence import pad_sequences
 
+
 class PreProcessing():
 
         types = ['Training', 'Validation', 'Test'] 
@@ -52,21 +53,17 @@ class PreProcessing():
             print('completed: build_embeddings')  
             return embedding_matrix
 
-        def build_dataset(self, x, word_index):
-
-            f = lambda word: word_index.get(word.lower()) if word_index.has_key(word.lower()) else -1
+        def build_dataset(self, x):
             data = Data()
             d = x.__dir__()
             for key, value in d.items():
-                word_seq = [kerasPreProc.text_to_word_sequence(text) for text in value ]
-                numb_seq = [[f(word) for word in word_seq[s]] for s in range(len(word_seq))]
-		if key == "train": 
+                numb_seq = PreProcessing.tokenizer.texts_to_sequences(value)
+                if key == "train": 
 		   data.train = np.array(numb_seq)
 		elif key == "test":
                    data.test = np.array(numb_seq)
                 else: 
                    data.validation = np.array(numb_seq)
-
             print('completed: build_dataset')  
             return data
 
@@ -76,7 +73,7 @@ class PreProcessing():
             data.validation = sequence.pad_sequences(data.validation, maxlen=max_len,padding='post',truncating='post') 
             return data
 
-        def convert_onehot(self, y, max_len):   
+        def convert_onehot(self, y):   
  
              g = lambda elem: [1,0,0] if elem == 0  else [0,1,0] if elem == 1 else [0,0,1]
              h = lambda a: map(g, a)
