@@ -1,19 +1,18 @@
 import os
-import numpy as np
 import collections
+import numpy as np
 from util import Reader
 from entities.data import Data
+from entities.dictionary import Dictionary
 from keras.preprocessing import sequence
-import keras.preprocessing.text as kerasPreProc
 from keras.preprocessing.sequence import pad_sequences
 
 
 class PreProcessing():
 
-        types = ['Training', 'Validation', 'Test'] 
-        tokenizer = kerasPreProc.Tokenizer()
-        
-        
+        types = ['Training', 'Validation', 'Test']    
+        dicty = Dictionary()
+
         def load_data(self, dataset):
             util = Reader()
             x, y, f = {}, {}, {} 
@@ -28,10 +27,10 @@ class PreProcessing():
             print('completed: load_data')
             return x_obj, y_obj, files
 
-        def build_indices(self, x_):
-            texts = x_.train + x_.validation + x_.test
-            PreProcessing.tokenizer.fit_on_texts(texts)
-            word_index = PreProcessing.tokenizer.word_index
+        def build_indices(self, x):
+            tokenized_documents = x.train + x.validation + x.test
+            PreProcessing.dicty.fit_on_texts(tokenized_documents)
+            word_index = PreProcessing.dicty.word_index
             print('Found %s unique tokens.' % len(word_index))
             print('completed: build_indices')
             return word_index
@@ -57,7 +56,7 @@ class PreProcessing():
             data = Data()
             d = x.__dir__()
             for key, value in d.items():
-                numb_seq = PreProcessing.tokenizer.texts_to_sequences(value)
+                numb_seq = PreProcessing.dicty.texts_to_sequences(value)
                 if key == "train": 
 		   data.train = np.array(numb_seq)
 		elif key == "test":
@@ -73,8 +72,9 @@ class PreProcessing():
             data.validation = sequence.pad_sequences(data.validation, maxlen=max_len,padding='post',truncating='post') 
             return data
 
-        def convert_onehot(self, y):   
- 
+
+        def convert_onehot(self, y): 
+
              g = lambda elem: [1,0,0] if elem == 0  else [0,1,0] if elem == 1 else [0,0,1]
              h = lambda a: map(g, a)
              y.train = np.apply_along_axis(h, axis=1, arr=y.train)
@@ -92,7 +92,4 @@ class PreProcessing():
                         sample_weights[i,k] = 1;
                     else :
                         sample_weights[i,k] = 50;
-             
-            sample_weights_reshape = np.array(sample_weights).flatten() # ????
-
             return sample_weights

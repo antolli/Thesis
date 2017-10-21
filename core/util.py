@@ -3,15 +3,18 @@ import json
 import collections
 import numpy as np
 from nltk import PorterStemmer
-import keras.preprocessing.text as kerasPreProc
+from entities.tokenizer import Tokenizer
+from entities.dictionary import Dictionary
 
 class Reader():
-                     
+
+        tokenizer =  Tokenizer('eg')
+
         def read_terms(self, dataset, typ):            
             x, y, files_list = [], [], []
             f_text, list_keyphr = [], []
             path = "datasets/%s/%s" % (dataset, typ) 
-
+          
             for f in os.listdir(path):
                 "------------------ HULTH DATASET----------------------------------------------------------"
                 if dataset == "Hulth2003":
@@ -19,16 +22,22 @@ class Reader():
                         continue
                     f_uncontr = open(os.path.join(path, f), "rU")
                     f_text = open(os.path.join(path, f.replace(".uncontr", ".abstr")), "rU")
-                    text = "".join(map(str, f_text))
+                    text = "".join(map(str, f_text)) 
+                    kp_uncontr = "".join(map(str, f_uncontr)) 
+                    
+                    list_keyphr = [Reader.tokenizer.word_tokenize(kp) for kp in kp_uncontr.split(";")]
+                    list_sentences = Reader.tokenizer.sentence_tokenize(text)
 
-                    kp_uncontr = "".join(map(str, f_uncontr))
-                    list_keyphr = [ kerasPreProc.text_to_word_sequence(kp) for kp in kp_uncontr.split(";")]
+                    text_vec = []
+                    for string in list_sentences:
+                        for token in Reader.tokenizer.word_tokenize(string):
+                            text_vec.append(token)
 
-                    text_vec = kerasPreProc.text_to_word_sequence(text)
-                    x.append(text) 
                     files_list.append(f)
+                    x.append(text_vec)
                     y.append(self.calc_expected_values(text_vec, list_keyphr))
                 "------------------ SEMEVAL 2010 DATASET----------------------------------------------------"
+                """
                 if dataset == "SemEval2010":
                     if not list_keyphr:
                        dict_ann = {}
@@ -98,8 +107,9 @@ class Reader():
                     x.append(text) 
                     files_list.append(f)
                     y.append(self.calc_expected_values(text_vec, list_keyphr))
-                "---------------------------------------------------------------------------------------------"           
-
+                """
+                "---------------------------------------------------------------------------------------------"     
+            
             return  x, y, files_list
 
         def calc_expected_values(self, text_vec, list_keyphr):
@@ -115,27 +125,51 @@ class Reader():
                        y_inner[(i+1):(i+1)+len(kp)-1] = 2
             return y_inner 
 
+
+"""
+    Generates the output file to feed "distiller_metrics" system
+    :attr dicty: instance of dictionary
+    :def generate_obtained_file: 
+    :: param model_predict: predictions generated 
+    :: param x: the list of documents (each word represented by an index)
+    :: param files: the list of file's names
+    :: this method produces a txt file with the following aspect:
+    ::: 'name_of_doc_1: keyphrase_1, keyphrase_2, ... ,\n' 
+    ::: 'name_of_doc_2: keyphrase_1, keyphrase_2, ... ,\n' 
+    ::
+    :: return: nothing
+
+"""
 class Output():
-        
-        def generate_obtained_file(self, model_predict, x, files): 
-                h = lambda a: a * 100
-                percent_values = np.apply_along_axis(h, axis=1, arr=model_predict) # converts in percentual
 
-                doc  = [kerasPreProc.text_to_word_sequence(text) for text in x ]
-                with open('../results/obtained.txt','w') as f: 
-                     key_phrase = ''
-                     for row in range(len(percent_values)) : 
-                         # files[row] contains the file name
-                         content = ''.join([files[row], ': ']) if row == 0 else ''.join([content, files[row], ': '])
-                         for col in range(len(percent_values[row])):
-                             category = np.argmax(percent_values[row,col]) # gets the max value's index
-                             if (category > 0): # a keyword has index 1 or 2, so key_phrase is composed only by 1's and 2's 
-                                 if col < len(doc[row]): key_phrase = ''.join([key_phrase, doc[row][col], ' ']) 
-                             else: 
-                                 if key_phrase is not '':
-                                    content = ''.join([content, key_phrase, ', '])
-                                    key_phrase = '' 
+       def __init__(self, dicty):
+           self.dicty = dicty
 
-                         content = ''.join([content, '\n'])
+       def generate_obtained_file(self, model_predict, x, files): 
+           h = lambda a: a * 100
+           percent_values = np.apply_along_axis(h, axis=1, arr=model_predict) # converts in percentual
+           content = self.generate_content_file(percent_values, x, files) # generates the content
+           with open('../results/obtained.txt','w') as f: 
+                f.write(content)
 
-                     f.write(content)
+       def generate_content_file(self, percent_values, x, files):
+           key_phrase = ''
+
+           for row in range(len(percent_values)) : 
+               words = self.dicty.tokens_to_words(x[row])
+               
+               content = ''.join([files[row], ': ']) if row == 0 else ''.join([content, files[row], ': '])
+               for col in range(len(percent_values[row])):
+                   category = np.argmax(percent_values[row,col]) # gets the max value's index
+                   if (category > 0): # a keyword has index 1 or 2, so key_phrase is composed only by 1's and 2's 
+                       if col < len(words):  
+                          key_phrase = ''.join([key_phrase, words[col], ' ']) 
+                   else: 
+                       if key_phrase is not '':
+                          content = ''.join([content, key_phrase, ', '])
+                          key_phrase = '' 
+
+               content = ''.join([content, '\n'])
+              
+           return content
+

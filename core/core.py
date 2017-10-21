@@ -3,7 +3,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from keras.models import Sequential, load_model
-from keras.layers import Dense, TimeDistributed, LSTM, Dropout
+from keras.layers import Dense, TimeDistributed, LSTM, Dropout, Masking, GRU
 from keras.layers.embeddings import Embedding
 from keras.layers.wrappers import Bidirectional
 from keras import optimizers, regularizers
@@ -20,23 +20,25 @@ MODEL_PATH = 'trained_model.h5'
 DATASET = 'Hulth2003'  # Hulth2003, SemEval2010, Krapivin2009, SemEval2017
 EMBEDDING = 'glove.6B.200d.txt'
 EMBEDDING_LENGTH = 200
-MAX_REVIEW_LENGTH = 516
+MAX_REVIEW_LENGTH = 554
 
 BATCH_SIZE = 32
-EPOCHS = 8
+EPOCHS = 14
 
 x_loaded, y_loaded, files = ppro.load_data(DATASET) # load dataset
 word_index = ppro.build_indices(x_loaded) # word_index: dictionary of the words in the docs
 embeddings_matrix = ppro.build_dict_embeddings(word_index, EMBEDDING_LENGTH, EMBEDDING) # maps embedd. -> word_index
+
 x = ppro.build_dataset(x_loaded) # replaces each word for its index in word_index
 
 x = ppro.truncate_pad(x, MAX_REVIEW_LENGTH) # truncate and pad input sequences (to x)
 y = ppro.truncate_pad(y_loaded, MAX_REVIEW_LENGTH) # idem (to y)
 y = ppro.convert_onehot(y) # one-hot encoding 
 
-# assigns different weights for each training example (Marco code)
+# assigns different weights for each training example
 sample_weights = ppro.diff_weights(x.train, y.train)
 sample_weights_val = ppro.diff_weights(x.validation, y.validation) # also added for validation set
+
 
 if not os.path.isfile(MODEL_PATH) : 
 
@@ -46,13 +48,16 @@ if not os.path.isfile(MODEL_PATH) :
                                                 weights=[embeddings_matrix],
                                                 input_length=MAX_REVIEW_LENGTH,
                                                 trainable=False, name='embedding'))
-        model.add(Bidirectional(LSTM(150, activation='tanh', recurrent_activation='hard_sigmoid', return_sequences=True), name='bi')) 
-        model.add(Dropout(0.25))
-        model.add(TimeDistributed(Dense(150, activation='relu', kernel_regularizer=regularizers.l2(0.01)), name='dense_relu'))
-        model.add(Dropout(0.25))
+        model.add(Masking(0, input_shape=(MAX_REVIEW_LENGTH, EMBEDDING_LENGTH)))
+        model.add(Bidirectional(LSTM(184, activation='tanh', recurrent_activation='hard_sigmoid', return_sequences=True), name='bi')) 
+        model.add(Dropout(0.5))
+        model.add(TimeDistributed(Dense(184, activation='relu', kernel_regularizer=regularizers.l2(0.01)), name='dense_relu'))
+        #model.add(GRU(100,return_sequences=True))
+        model.add(Dropout(0.5))
         model.add(TimeDistributed(Dense(3, activation='softmax'), name='out'))
         #model.load_weights('model_weights_kr.h5') fineTuning
-        optimizer = optimizers.RMSprop(lr=0.001, rho=0.9, epsilon=1e-08, decay=0.0) # check it better latter
+        optimizer = optimizers.RMSprop(lr=0.005, rho=0.9, epsilon=1e-08, decay=0.0) # check it better latter
+        #optimizer = optimizers.Adam(lr=0.005)
         model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'], sample_weight_mode="temporal")
         print(model.summary())
         validation_data=(x.validation, y.validation, sample_weights_val) # will override validation_split.
@@ -93,6 +98,6 @@ print("Predicting...")
 model_predict = model.predict(x=x.test, batch_size=32, verbose=0)
 print("Saving to file...")
 #instantiate output
-output = Output()
-output.generate_obtained_file(model_predict=model_predict, x=x_loaded.test, files=files.test)
+output = Output(dicty=ppro.dicty)
+output.generate_obtained_file(model_predict=model_predict, x=x.test, files=files.test)
 print("Done.")
