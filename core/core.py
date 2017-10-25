@@ -17,10 +17,10 @@ ppro = PreProcessing()
 np.random.seed(7)
 
 MODEL_PATH = 'trained_model.h5'
-DATASET = 'Hulth2003'  # Hulth2003, SemEval2010, Krapivin2009, SemEval2017
-EMBEDDING = 'glove.6B.200d.txt'
-EMBEDDING_LENGTH = 200
-MAX_REVIEW_LENGTH = 554
+DATASET = 'Krapivin2009'  # Hulth2003, SemEval2010, Krapivin2009, SemEval2017
+EMBEDDING = 'glove.6B.300d.txt'
+EMBEDDING_LENGTH = 300
+MAX_REVIEW_LENGTH = 1200
 
 BATCH_SIZE = 32
 EPOCHS = 14
@@ -31,6 +31,9 @@ embeddings_matrix = ppro.build_dict_embeddings(word_index, EMBEDDING_LENGTH, EMB
 
 x = ppro.build_dataset(x_loaded) # replaces each word for its index in word_index
 
+print("Max length of training documents : " + str(max([len(seq) for seq in x.train])))
+print("Max length of testing documents : " + str(max([len(seq) for seq in x.test])))
+
 x = ppro.truncate_pad(x, MAX_REVIEW_LENGTH) # truncate and pad input sequences (to x)
 y = ppro.truncate_pad(y_loaded, MAX_REVIEW_LENGTH) # idem (to y)
 y = ppro.convert_onehot(y) # one-hot encoding 
@@ -38,7 +41,6 @@ y = ppro.convert_onehot(y) # one-hot encoding
 # assigns different weights for each training example
 sample_weights = ppro.diff_weights(x.train, y.train)
 sample_weights_val = ppro.diff_weights(x.validation, y.validation) # also added for validation set
-
 
 if not os.path.isfile(MODEL_PATH) : 
 
@@ -48,16 +50,13 @@ if not os.path.isfile(MODEL_PATH) :
                                                 weights=[embeddings_matrix],
                                                 input_length=MAX_REVIEW_LENGTH,
                                                 trainable=False, name='embedding'))
-        model.add(Masking(0, input_shape=(MAX_REVIEW_LENGTH, EMBEDDING_LENGTH)))
         model.add(Bidirectional(LSTM(184, activation='tanh', recurrent_activation='hard_sigmoid', return_sequences=True), name='bi')) 
         model.add(Dropout(0.5))
-        model.add(TimeDistributed(Dense(184, activation='relu', kernel_regularizer=regularizers.l2(0.01)), name='dense_relu'))
-        #model.add(GRU(100,return_sequences=True))
-        model.add(Dropout(0.5))
+        #model.add(TimeDistributed(Dense(150, activation='relu', kernel_regularizer=regularizers.l2(0.01)), name='dense_relu'))
+        #model.add(Dropout(0.25))
         model.add(TimeDistributed(Dense(3, activation='softmax'), name='out'))
         #model.load_weights('model_weights_kr.h5') fineTuning
-        optimizer = optimizers.RMSprop(lr=0.005, rho=0.9, epsilon=1e-08, decay=0.0) # check it better latter
-        #optimizer = optimizers.Adam(lr=0.005)
+        optimizer = optimizers.RMSprop(lr=0.005, rho=0.9, epsilon=1e-08, decay=0.0) # check it better latter 0.0001
         model.compile(loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'], sample_weight_mode="temporal")
         print(model.summary())
         validation_data=(x.validation, y.validation, sample_weights_val) # will override validation_split.

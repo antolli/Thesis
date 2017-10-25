@@ -36,8 +36,7 @@ class Reader():
                     files_list.append(f)
                     x.append(text_vec)
                     y.append(self.calc_expected_values(text_vec, list_keyphr))
-                "------------------ SEMEVAL 2010 DATASET----------------------------------------------------"
-                """
+                "------------------ SEMEVAL 2010 DATASET----------------------------------------------------"              
                 if dataset == "SemEval2010":
                     if not list_keyphr:
                        dict_ann = {}
@@ -49,23 +48,33 @@ class Reader():
                             for l in linespl: # It won't be used to feed the network.
                                 name_doc = l[0].strip() # split each row by "name_doc" and "kp_found"
                                 kp_found = l[1].split(',') 
-                                dict_ann[name_doc] = [ kerasPreProc.text_to_word_sequence(kp) for kp in kp_found]
+                                dict_ann[name_doc] = [Reader.tokenizer.word_tokenize(kp.decode('utf-8')) for kp in kp_found]
+
                     if not f.endswith(".txt.final"):
                         continue
                     f_text = open(os.path.join(path, f), "rU")
                     list_keyphr = dict_ann[f.split('.')[0]]
                     content = "".join(map(str, f_text))
+
                     if typ != 'Test':
                        text = content 
                     else: 
                        stm = lambda string: PorterStemmer().stem(string)
                        text = ''.join(map(stm, content))
 
-                    text_vec = kerasPreProc.text_to_word_sequence(text)
-                    x.append(text) 
-                    files_list.append(f)
+                    list_sentences = Reader.tokenizer.sentence_tokenize(text.decode('utf-8'))
+
+                    text_vec = []
+                    for string in list_sentences:
+                        for token in Reader.tokenizer.word_tokenize(string):
+                            text_vec.append(token)
+                    name_file = f.split('.')
+                    files_list.append(name_file[0])
+                    x.append(text_vec)
                     y.append(self.calc_expected_values(text_vec, list_keyphr))
+
                 "------------------ KRAPIVIN DATASET----------------------------------------------------------"
+                
                 if dataset == "Krapivin2009":
                     file_name = ''.join(['ke20k_', typ.lower(), '.json'])
                     with open(os.path.join(path, file_name)) as f:
@@ -74,13 +83,21 @@ class Reader():
 		            if count_doc <= 2000: # needed because 20k is too large
 	    		       d = json.loads(line)
 			       text = ''.join([d["title"], d["abstract"]])
-			       text_vec = kerasPreProc.text_to_word_sequence(text.encode("utf-8"))
-			       x.append(text.encode("utf-8"))
-			       files_list.append(count_doc) 
-                               kp_list = d["keyword"].split(";")
-			       list_keyphr = [kerasPreProc.text_to_word_sequence(kp.encode("utf-8")) for kp in kp_list] 
+
+                               kp_list = d["keyword"].split(";") 
+                               list_keyphr = [Reader.tokenizer.word_tokenize(kp.encode('utf-8')) for kp in kp_list]
+                               list_sentences = Reader.tokenizer.sentence_tokenize(text.encode('utf-8'))
+
+                               text_vec = []
+                               for string in list_sentences:
+                                   for token in Reader.tokenizer.word_tokenize(string):
+                                       text_vec.append(token)
+
+                               files_list.append(str(count_doc))
+                               x.append(text_vec)
                                y.append(self.calc_expected_values(text_vec, list_keyphr))
                                count_doc = count_doc + 1
+                
                 "------------------ SEMEVAL 2017 DATASET------------------------------------------------------" 
                 if dataset == "SemEval2017":
                     if not f.endswith(".ann"):
@@ -101,15 +118,20 @@ class Reader():
 		           if not keytype.endswith("-of"): # e.g.:Synonym-of
 			      keyphr_ann = anno_inst[2] 
 			      kp_list.append(keyphr_ann)
-                    list_keyphr = [kerasPreProc.text_to_word_sequence(kp) for kp in kp_list]
 
-                    text_vec = kerasPreProc.text_to_word_sequence(text)
-                    x.append(text) 
+                    list_keyphr = [Reader.tokenizer.word_tokenize(kp.decode('utf-8')) for kp in kp_list]
+                    list_sentences = Reader.tokenizer.sentence_tokenize(text.decode('utf-8'))
+
+                    text_vec = []
+                    for string in list_sentences:
+                        for token in Reader.tokenizer.word_tokenize(string):
+                            text_vec.append(token)
+
                     files_list.append(f)
+                    x.append(text_vec)
                     y.append(self.calc_expected_values(text_vec, list_keyphr))
-                """
-                "---------------------------------------------------------------------------------------------"     
-            
+                "---------------------------------------------------------------------------------------------"   
+
             return  x, y, files_list
 
         def calc_expected_values(self, text_vec, list_keyphr):
@@ -150,7 +172,7 @@ class Output():
            percent_values = np.apply_along_axis(h, axis=1, arr=model_predict) # converts in percentual
            content = self.generate_content_file(percent_values, x, files) # generates the content
            with open('../results/obtained.txt','w') as f: 
-                f.write(content)
+                f.write(content.encode('utf-8'))
 
        def generate_content_file(self, percent_values, x, files):
            key_phrase = ''
